@@ -1,59 +1,47 @@
-import { Console } from "./manager.js";
-import { Player } from "./player.js";
-import { Cursor } from "./cursor.js";
-import { Bullet } from "./bullet.js";
-import { Camera } from "./camera.js";
-import { Monster } from "./monster.js";
+import { Console } from "./scripts/manager.js";
+import { Player } from "./scripts/player.js";
+import { Cursor } from "./scripts/cursor.js";
+import { Bullet } from "./scripts/bullet.js";
+import { Camera } from "./scripts/camera.js";
+import { Monster } from "./scripts/monster.js";
+import { Trail } from "./scripts/trail.js";
 
 let game_console = new Console();
 
 let gpad = new Gamepad();
 
-let canvas1 = document.getElementById("canvas1");
-let canvas2 = document.getElementById("canvas2");
-let canvas3 = document.getElementById("canvas3");
-let canvas4 = document.getElementById("canvas4");
+let canvases = [document.getElementById("canvas1"), document.getElementById("canvas2"), document.getElementById("canvas3"), document.getElementById("canvas4")];
+let ctex = [];
 
-canvas1.style.display = "none";
-canvas2.style.display = "none";
-canvas3.style.display = "none";
-canvas4.style.display = "none";
+for (let canvas of canvases) {
+    canvas.style.display = "none";
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    ctex.push(canvas.getContext("2d"));
+}
 
-let camera1 = new Camera(canvas1.getContext("2d"));
-let camera2 = new Camera(canvas2.getContext("2d"));
-let camera3 = new Camera(canvas3.getContext("2d"));
-let camera4 = new Camera(canvas4.getContext("2d"));
+let cameras = [];
 
+for (let ctx of ctex) {
+    cameras.push(new Camera(ctx));
+};
 
 let players = [];
 let cursors = [];
 let bullets = [];
 let monsters = [];
+let trails = [];
+
 
 window.onload = () => {
     begin();
 };
 
 function begin() {
-    canvas1.width = window.innerWidth;
-    canvas1.height = window.innerHeight;
-    canvas2.width = window.innerWidth;
-    canvas2.height = window.innerHeight;
-    canvas3.width = window.innerWidth;
-    canvas3.height = window.innerHeight;
-    canvas4.width = window.innerWidth;
-    canvas4.height = window.innerHeight;
-
-    players.push(new Player());
-    players.push(new Player());
-    players.push(new Player());
-    players.push(new Player());
-
-    cursors.push(new Cursor());
-    cursors.push(new Cursor());
-    cursors.push(new Cursor());
-    cursors.push(new Cursor());
-
+    for (let x = 0; x < 4; x++) {
+        players.push(new Player(ctex));
+        cursors.push(new Cursor(ctex));
+    }
 
     gpad.on('connect', e => {
         players[e.index].online = true;
@@ -78,6 +66,7 @@ function begin() {
 
                 if (button == "button_1") {
                     players[e.player].speed = 2.5;
+                    trails.push(new Trail(ctex, players[e.player].x, players[e.player].y));
                 }
 
                 if (button == "shoulder_bottom_right") {
@@ -101,11 +90,8 @@ function begin() {
 
                 if (button == "button_1") {
                     players[e.player].speed = 2.5;
+                    trails.push(new Trail(ctex, players[e.player].x, players[e.player].y));
                 }
-
-                if (button == "shoulder_bottom_right") {
-                    bullets.push(new Bullet(players[e.player].x, players[e.player].y, cursors[e.player].x - players[e.player].x, cursors[e.player].y - players[e.player].y));
-                };
 
                 if (e.value) {
                     if (button == "stick_axis_left") {
@@ -150,28 +136,38 @@ function begin() {
     }, 1000);
 
     requestAnimationFrame(render);
-    requestAnimationFrame(game);
 }
 
 function render() {
-    canvas1.getContext("2d").clearRect(0, 0, window.innerWidth, window.innerHeight);
-    canvas2.getContext("2d").clearRect(0, 0, window.innerWidth, window.innerHeight);
-    canvas3.getContext("2d").clearRect(0, 0, window.innerWidth, window.innerHeight);
-    canvas4.getContext("2d").clearRect(0, 0, window.innerWidth, window.innerHeight);
+    for (let x in ctex) {
+        let ctx = ctex[x];
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        switch (x) {
+            case 1:
+                ctx.fillStyle = "white";
+                break;
 
-    canvas1.getContext("2d").fillRect(0, 0, window.innerWidth, window.innerHeight);
-    canvas1.getContext("2d").fillStyle = "white";
-    canvas2.getContext("2d").fillRect(0, 0, window.innerWidth, window.innerHeight);
-    canvas2.getContext("2d").fillStyle = "silver";
-    canvas3.getContext("2d").fillRect(0, 0, window.innerWidth, window.innerHeight);
-    canvas3.getContext("2d").fillStyle = "teal";
-    canvas4.getContext("2d").fillRect(0, 0, window.innerWidth, window.innerHeight);
-    canvas4.getContext("2d").fillStyle = "navy";
+            case 2:
+                ctx.fillRect = "silver";
+                break;
 
-    camera1.begin();
-    camera2.begin();
-    camera3.begin();
-    camera4.begin();
+            case 3:
+                ctx.fillStyle = "teal";
+                break;
+
+            case 4:
+                ctx.fillStyle = "navy";
+                break;
+        }
+
+        ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+
+    for (let x in cameras) {
+        let camera = cameras[x];
+        camera.begin();
+        camera.moveTo(players[x].x, players[x].y);
+    }
 
     for (let player of players) {
         if (player.online) {
@@ -179,11 +175,6 @@ function render() {
             player.draw();
         }
     }
-
-    camera1.moveTo(players[0].x, players[0].y);
-    camera2.moveTo(players[1].x, players[1].y);
-    camera3.moveTo(players[2].x, players[2].y);
-    camera4.moveTo(players[3].x, players[3].y);
 
     for (let cursor of cursors) {
         if (cursor.online) {
@@ -201,39 +192,32 @@ function render() {
 
     for (let monster of monsters) {
         let pos = monster.getClosestPlayer(players);
-        console.log(pos);
-
         monster.moveTo(pos.x, pos.y);
         monster.draw();
     }
 
-    camera1.end();
-    camera2.end();
-    camera3.end();
-    camera4.end();
+    for (let trail of trails) {
+        if (trail.life > 0) {
+            trail.draw();
+        }
+    }
+
+    for (let camera of cameras) {
+        camera.end();
+    }
 
     requestAnimationFrame(render);
 }
 
-function game() {
-
-    requestAnimationFrame(game);
-};
-
 window.onresize = () => {
-    canvas1.width = window.innerWidth;
-    canvas1.height = window.innerHeight;
-    canvas2.width = window.innerWidth;
-    canvas2.height = window.innerHeight;
-    canvas3.width = window.innerWidth;
-    canvas3.height = window.innerHeight;
-    canvas4.width = window.innerWidth;
-    canvas4.height = window.innerHeight;
+    for (let canvas of canvases) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
 
-    camera1.update();
-    camera2.update();
-    camera3.update();
-    camera4.update();
+    for (let camera of cameras) {
+        camera.update();
+    }
 
     updateSplitscreen();
 
@@ -250,66 +234,66 @@ function updateSplitscreen() {
 
     switch (count) {
         case 1:
-            canvas1.style.display = "block";
-            canvas2.style.display = "none";
-            canvas3.style.display = "none";
-            canvas4.style.display = "none";
+            canvases[0].style.display = "block";
+            canvases[1].style.display = "none";
+            canvases[2].style.display = "none";
+            canvases[3].style.display = "none";
 
-            canvas1.width = window.innerWidth;
-            canvas1.height = window.innerHeight;
+            canvases[0].width = window.innerWidth;
+            canvases[0].height = window.innerHeight;
             break;
 
         case 2:
-            canvas2.style.display = "block";
-            canvas3.style.display = "none";
+            canvases[1].style.display = "block";
+            canvases[2].style.display = "none";
             canvas4.style.display = "none";
 
-            canvas1.width = window.innerWidth / 2;
-            canvas1.height = window.innerHeight;
+            canvases[0].width = window.innerWidth / 2;
+            canvases[0].height = window.innerHeight;
 
-            canvas2.width = window.innerWidth / 2;
-            canvas2.height = window.innerHeight;
-            canvas2.style.right = "0px";
+            canvases[1].width = window.innerWidth / 2;
+            canvases[1].height = window.innerHeight;
+            canvases[1].style.right = "0px";
 
             break;
 
         case 3:
-            canvas3.style.display = "block";
-            canvas4.style.display = "none";
+            canvases[2].style.display = "block";
+            canvases[3].style.display = "none";
 
-            canvas1.width = window.innerWidth / 2;
-            canvas1.height = window.innerHeight / 2;
+            canvases[0].width = window.innerWidth / 2;
+            canvases[0].height = window.innerHeight / 2;
 
-            canvas2.width = window.innerWidth / 2;
-            canvas2.height = window.innerHeight / 2;
-            canvas2.style.right = "0px";
+            canvases[1].width = window.innerWidth / 2;
+            canvases[1].height = window.innerHeight / 2;
+            canvases[1].style.right = "0px";
 
-            canvas3.width = window.innerWidth / 2;
-            canvas3.height = window.innerHeight / 2;
-            canvas3.style.left = "0px";
-            canvas3.style.bottom = "0px";
+            canvases[2].width = window.innerWidth / 2;
+            canvases[2].height = window.innerHeight / 2;
+            canvases[2].style.left = "0px";
+            canvases[2].style.bottom = "0px";
 
             break;
         case 4:
-            canvas4.style.display = "block";
+            canvases[3].style.display = "block";
 
-            canvas1.width = window.innerWidth / 2;
-            canvas1.height = window.innerHeight / 2;
+            canvases[0].width = window.innerWidth / 2;
+            canvases[0].height = window.innerHeight / 2;
 
-            canvas2.width = window.innerWidth / 2;
-            canvas2.height = window.innerHeight / 2;
-            canvas2.style.right = "0px";
-            canvas2.style.top = "0px";
+            canvases[1].width = window.innerWidth / 2;
+            canvases[1].height = window.innerHeight / 2;
+            canvases[1].style.right = "0px";
+            canvases[1].style.top = "0px";
 
-            canvas3.width = window.innerWidth / 2;
-            canvas3.height = window.innerHeight / 2;
-            canvas2.style.left = "0px";
-            canvas2.style.bottom = "0px";
+            canvases[2].width = window.innerWidth / 2;
+            canvases[2].height = window.innerHeight / 2;
+            canvases[1].style.left = "0px";
+            canvases[1].style.bottom = "0px";
 
-            canvas4.width = window.innerWidth / 2;
-            canvas4.height = window.innerHeight / 2;
-            canvas2.style.right = "0px";
-            canvas2.style.bottom = "0px";
+            canvases[3].width = window.innerWidth / 2;
+            canvases[3].height = window.innerHeight / 2;
+            canvases[1].style.right = "0px";
+            canvases[1].style.bottom = "0px";
             break;
     };
 }
@@ -317,7 +301,4 @@ function updateSplitscreen() {
 function generateMonsters() {
     let mon = new Monster();
     monsters.push(mon);
-
-    console.log(`Monsters active: ${monsters.length}`);
-    console.log(monsters);
 };
